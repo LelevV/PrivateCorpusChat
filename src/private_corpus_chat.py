@@ -1,8 +1,10 @@
 import openai
 import numpy as np
+import pandas as pd
 from numpy.linalg import norm
 import json
 import os
+import datetime
 
 
 def get_txt_file_as_str(file):
@@ -56,7 +58,6 @@ def process_raw_files():
 def get_embedding(text):
      # to avoid using chars that GPT doesnt like
     text = text.encode(encoding='ASCII', errors='ignore').decode()
-    
     response = openai.Embedding.create(
         input=text,
         model="text-embedding-ada-002"
@@ -84,19 +85,16 @@ def create_embedding_index():
             'source_text':text,
             'embedding':embedding
         }
-        json_name = f'{file}_embedding'
+        json_name = f'{file[:-4]}_embedding.json'
         write_dict_to_json_file(embedding_index_dir+json_name, embedding_dict)
-    
 
 
 def gpt3_text_completion(prompt, model, max_tokens=60):
     # check if valid model
     gpt3_models = ['text-davinci-003', 'text-curie-001', 'text-babbage-001', 'text-ada-001']
     assert model in gpt3_models, 'Not a valid model!'
-
     # to avoid using chars that GPT doesnt like
     prompt = prompt.encode(encoding='ASCII', errors='ignore').decode()
-    
     # prompt model via api call
     response = openai.Completion.create(
         model=model,
@@ -107,9 +105,73 @@ def gpt3_text_completion(prompt, model, max_tokens=60):
         frequency_penalty=0.0,
         presence_penalty=1
     )
-    
     text = response['choices'][0]['text']
-
     return text, response 
 
+
+
+def log_prompt(prompt, prompt_type):
+
+    log_dir = '..//logs//'
+    dt_str = str(datetime.datetime.now())
+    log_i = 0
+    log_i = len(os.listdir(log_dir))
+    json_name = f'log_entry__{prompt_type}__{log_i}.json'
+    d = {
+        'creation_dt':dt_str,
+        'prompt_type':prompt_type, 
+        'prompt':prompt,
+        'file_name':json_name,
+        'embedding': get_embedding(prompt)
+        }
+    log_file_name = log_dir+json_name
+    write_dict_to_json_file(log_file_name, d)
+    return log_file_name
+
+
+def retrieve_top_n_simular_docs(prompt_log_file, corpus_embedding_dir, top_n):
+
+    # load prompt data 
+    prompt_dict = get_json_file_as_dict(prompt_log_file)
+    prompt_embedding_vector = prompt_dict['embedding']
+
+    # get query simularity for all files in corpus embedding dir
+    simularities = []
+    docs_embedding_files = os.listdir(corpus_embedding_dir)
+    for doc_embedding_file in docs_embedding_files:
+        # load file data
+        doc_embedding_dict = get_json_file_as_dict(corpus_embedding_dir+doc_embedding_file)
+        doc_embedding_source_file = doc_embedding_dict['source_file']
+        doc_embedding_vector = doc_embedding_dict['embedding']
+        doc_embedding_text = doc_embedding_dict['source_text']
+        # get simularity
+        simularity = get_cosine_sim(prompt_embedding_vector, doc_embedding_vector)
+        simularities.append([doc_embedding_source_file, simularity])
+    
+    # only retrieve top n simular docs 
+    sim_df = pd.DataFrame(simularities, columns=['source_file', 'simularity'])
+    sim_df = sim_df.sort_values('simularity', ascending=False)
+    top_n_docs = list(sim_df['source_file'][:top_n])
+    return top_n_docs
+
+
+if __name__ == '__main__':
+
+    TOP_N_RETRIEVAL = 3
+    CORPUS_EMBEDDING_DIR = '..//corpus//embedding_index//'
+    CORPUS_PROCESSED_DIR = '..//corpus//processed//'
+
+    # the main chat loop 
+    while True:
+        # ask for initial user prompt
+        prompt = input('\n\nUSER: ')
+        # log the prompt
+        prompt_log_file = log_prompt(prompt, 'initial_prompt')
+        # retrieve top N docs 
+        relevant_docs = retrieve_top_n_simular_docs(prompt_log_file, CORPUS_EMBEDDING_DIR, TOP_N_RETRIEVAL)
+
+        print(f"\n\nBOT: {relevant_docs} \n\n")
+        for file in relevant_docs:
+            text = get_txt_file_as_str(CORPUS_PROCESSED_DIR+file)
+            print(text, '\n\n')
 
