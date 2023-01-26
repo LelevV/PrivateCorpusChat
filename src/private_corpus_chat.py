@@ -110,7 +110,7 @@ def gpt3_text_completion(prompt, model, max_tokens=60):
 
 
 
-def log_prompt(prompt, prompt_type):
+def log_prompt(prompt, prompt_type, add_embedding=False):
 
     log_dir = '..//logs//'
     dt_str = str(datetime.datetime.now())
@@ -122,24 +122,24 @@ def log_prompt(prompt, prompt_type):
         'prompt_type':prompt_type, 
         'prompt':prompt,
         'file_name':json_name,
-        'embedding': get_embedding(prompt)
         }
+    if add_embedding: # only add embedding if specified 
+        d['embedding'] = get_embedding(prompt)
     log_file_name = log_dir+json_name
     write_dict_to_json_file(log_file_name, d)
     return log_file_name
 
 
 def retrieve_top_n_simular_docs(prompt_log_file, corpus_embedding_dir, top_n):
-
     # load prompt data 
     prompt_dict = get_json_file_as_dict(prompt_log_file)
     prompt_embedding_vector = prompt_dict['embedding']
 
     # get query simularity for all files in corpus embedding dir
-    simularities = []
+    simularities = [] # [doc_embedding_source_file, simularity]
     docs_embedding_files = os.listdir(corpus_embedding_dir)
     for doc_embedding_file in docs_embedding_files:
-        # load file data
+        # load doc data
         doc_embedding_dict = get_json_file_as_dict(corpus_embedding_dir+doc_embedding_file)
         doc_embedding_source_file = doc_embedding_dict['source_file']
         doc_embedding_vector = doc_embedding_dict['embedding']
@@ -158,20 +158,30 @@ def retrieve_top_n_simular_docs(prompt_log_file, corpus_embedding_dir, top_n):
 if __name__ == '__main__':
 
     TOP_N_RETRIEVAL = 3
+    GPT3_MODEL = 'text-davinci-003'
+    MAX_TOKENS = 300
     CORPUS_EMBEDDING_DIR = '..//corpus//embedding_index//'
     CORPUS_PROCESSED_DIR = '..//corpus//processed//'
+    CONTEXT_PROMPT_FILE = '..//base_prompts//base_context_prompt_dutch.txt'
 
     # the main chat loop 
     while True:
         # ask for initial user prompt
-        prompt = input('\n\nUSER: ')
+        user_prompt = input('\n\nUSER: ')
         # log the prompt
-        prompt_log_file = log_prompt(prompt, 'initial_prompt')
+        prompt_log_file = log_prompt(user_prompt, 'initial_prompt', add_embedding=True)
         # retrieve top N docs 
         relevant_docs = retrieve_top_n_simular_docs(prompt_log_file, CORPUS_EMBEDDING_DIR, TOP_N_RETRIEVAL)
-
-        print(f"\n\nBOT: {relevant_docs} \n\n")
-        for file in relevant_docs:
-            text = get_txt_file_as_str(CORPUS_PROCESSED_DIR+file)
-            print(text, '\n\n')
-
+        # read the docs as str
+        relevant_docs_str = [get_txt_file_as_str(CORPUS_PROCESSED_DIR+file) for file in relevant_docs]
+        relevant_docs_str = '\n'.join(relevant_docs_str) 
+        # generate prompt with context
+        context_prompt = get_txt_file_as_str(CONTEXT_PROMPT_FILE)
+        context_prompt = context_prompt.replace('###USER_PROMPT###', user_prompt)
+        context_prompt = context_prompt.replace('###CONTEXT###', relevant_docs_str)
+        context_prompt_log_file = log_prompt(context_prompt, 'context_prompt')
+        # gpt completion 
+        text, response = gpt3_text_completion(context_prompt, GPT3_MODEL, max_tokens=MAX_TOKENS)
+        response_prompt_log_file = log_prompt(text, 'response')
+        print('\n\n\nBOT:\n', text)
+       

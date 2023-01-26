@@ -1,0 +1,18 @@
+Geef bondig antwoord op de volgende vraag, in journalistieke stijl:
+
+
+
+###USER_PROMPT###
+
+
+
+En maak in het antwoord uitsluitend gebruik van de volgende informatie:
+
+
+
+###CONTEXT###
+
+
+
+Antwoord:
+
