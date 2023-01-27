@@ -212,17 +212,27 @@ def ask_question():
 
     # ask for initial user prompt
     user_prompt = input('\n\n\nQuestion: ')
-    print('\n\n')
     # log the prompt
     prompt_log_file = log_prompt(user_prompt, 'initial_prompt', add_embedding=True)
+
     # retrieve top N docs 
     relevant_docs = retrieve_top_n_simular_docs(prompt_log_file, CORPUS_EMBEDDING_DIR, TOP_N_RETRIEVAL)
     # read the docs as str
     relevant_docs_str = [get_txt_file_as_str(CORPUS_PROCESSED_DIR+file) for file in relevant_docs]
     relevant_docs_str = '\n'.join(relevant_docs_str) 
+    
+    print()
+    collect_banner = pyfiglet.figlet_format('Collect relevant info')
+    print(collect_banner)
+    print(f'Retrieve top {TOP_N_RETRIEVAL} relevant documents (chunks) from corpus:')
+    for i, doc in enumerate(relevant_docs, start=1):
+        print(f'{i}.', doc)
 
     ### Summarize if context is too long
     if len(relevant_docs_str) > MAX_CONTEXT_LENGTH:
+        print()
+        summarize_banner = pyfiglet.figlet_format('Summarize')
+        print(summarize_banner)
         print('Context is too long; summarize...\n')
         # summarize relevant docs 
         print(f'Context summary:')
