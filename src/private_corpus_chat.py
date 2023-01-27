@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from numpy.linalg import norm
 import json
+import pyfiglet
 import os
 import datetime
 
@@ -163,7 +164,7 @@ def retrieve_top_n_simular_docs(prompt_log_file, corpus_embedding_dir, top_n):
     # only retrieve top n simular docs 
     sim_df = pd.DataFrame(simularities, columns=['source_file', 'simularity'])
     sim_df = sim_df.sort_values('simularity', ascending=False)
-    top_n_docs = list(sim_df['source_file'][:top_n])
+    top_n_docs = list(sim_df['source_file'].iloc[:top_n])
     return top_n_docs
 
 
@@ -179,6 +180,80 @@ def get_query_summary(content, user_prompt, model, summary_prompt):
         # completion
         summary, response = gpt3_text_completion(summary_prompt, model, max_tokens=300)
         return summary
+
+
+def list_files(startpath):
+    """To print all files in a directory"""
+    for root, dirs, files in os.walk(startpath):
+        level = root.replace(startpath, '').count(os.sep)
+        indent = ' ' * 4 * (level)
+        print('{}{}/'.format(indent, os.path.basename(root)))
+        subindent = ' ' * 4 * (level + 1)
+        for f in files:
+            print('{}{}'.format(subindent, f))
+
+
+def ask_question():
+    ### For now only one question:
+    
+    logo_banner = pyfiglet.figlet_format('Private Corpus Search')
+    print(logo_banner)
+    
+    print(''' 
+    --------------------------------------------------------------
+    ------ Ask a question about your private text corpus!!! ------
+    --------------------------------------------------------------     
+
+    '''
+    )
+
+    print('Your private corpus contains the following files:')
+    list_files(CORPUS_RAW_DIR)
+
+    # ask for initial user prompt
+    user_prompt = input('\n\n\nQuestion: ')
+    print('\n\n')
+    # log the prompt
+    prompt_log_file = log_prompt(user_prompt, 'initial_prompt', add_embedding=True)
+    # retrieve top N docs 
+    relevant_docs = retrieve_top_n_simular_docs(prompt_log_file, CORPUS_EMBEDDING_DIR, TOP_N_RETRIEVAL)
+    # read the docs as str
+    relevant_docs_str = [get_txt_file_as_str(CORPUS_PROCESSED_DIR+file) for file in relevant_docs]
+    relevant_docs_str = '\n'.join(relevant_docs_str) 
+
+    ### Summarize if context is too long
+    if len(relevant_docs_str) > MAX_CONTEXT_LENGTH:
+        print('Context is too long; summarize...\n')
+        # summarize relevant docs 
+        print(f'Context summary:')
+        relevant_docs_str = []
+        for i, file in enumerate(relevant_docs, start=1):
+            file_str = get_txt_file_as_str(CORPUS_PROCESSED_DIR+file)
+            file_summary = get_query_summary(file_str, user_prompt, GPT3_MODEL, SUMMARY_PROMPT_FILE)
+            context_prompt_log_file = log_prompt(file_summary, "summary_response", extra_info_dict={'user_prompt':user_prompt})
+            relevant_docs_str.append(file_summary)
+            print(f"\n({i}/{len(relevant_docs)}) [Notes of relevant (chunk) file] {file}:")
+            print(file_summary.strip(), '/n')
+        relevant_docs_str = '\n'.join(relevant_docs_str)
+        
+    else:
+        print(f'Context: {relevant_docs_str} \n\n')
+
+    ### Generate prompt with context
+    context_prompt = get_txt_file_as_str(CONTEXT_PROMPT_FILE)
+    context_prompt = context_prompt.replace('###USER_PROMPT###', user_prompt)
+    context_prompt = context_prompt.replace('###CONTEXT###', relevant_docs_str)
+    context_prompt_log_file = log_prompt(context_prompt, 'context_prompt')
+    # gpt completion 
+    text, response = gpt3_text_completion(context_prompt, GPT3_MODEL, max_tokens=MAX_TOKENS)
+    response_prompt_log_file = log_prompt(text, 'final_response')
+
+    print()
+    response_banner = pyfiglet.figlet_format('Response')
+    print(response_banner)
+    print('Question:', user_prompt)
+    print('\nAnswer:\n\n', text.strip())
+
 
 
 if __name__ == '__main__':
@@ -218,43 +293,9 @@ if __name__ == '__main__':
         create_embedding_index()
         print('Done creating embedding index!\n')
 
-    ### For now only one question:
-    # ask for initial user prompt
-    user_prompt = input('\n\n\nUSER: ')
-    print('\n\n')
-    # log the prompt
-    prompt_log_file = log_prompt(user_prompt, 'initial_prompt', add_embedding=True)
-    # retrieve top N docs 
-    relevant_docs = retrieve_top_n_simular_docs(prompt_log_file, CORPUS_EMBEDDING_DIR, TOP_N_RETRIEVAL)
-    # read the docs as str
-    relevant_docs_str = [get_txt_file_as_str(CORPUS_PROCESSED_DIR+file) for file in relevant_docs]
-    relevant_docs_str = '\n'.join(relevant_docs_str) 
+    # ask question
+    ask_question()
 
-    ### Summarize if context is too long
-    if len(relevant_docs_str) > MAX_CONTEXT_LENGTH:
-        print('Context is too long; summarize...\n')
-        # summarize relevant docs 
-        print(f'Context summary:')
-        relevant_docs_str = []
-        for file in relevant_docs:
-            file_str = get_txt_file_as_str(CORPUS_PROCESSED_DIR+file)
-            file_summary = get_query_summary(file_str, user_prompt, GPT3_MODEL, SUMMARY_PROMPT_FILE)
-            context_prompt_log_file = log_prompt(file_summary, "summary_response", extra_info_dict={'user_prompt':user_prompt})
-            relevant_docs_str.append(file_summary)
-            print(f"\nSOURCE]: {file}")
-            print(file_summary, '/n')
-        relevant_docs_str = '\n'.join(relevant_docs_str)
-        
-    else:
-        print(f'Context: {relevant_docs_str} \n\n')
 
-    ### Generate prompt with context
-    context_prompt = get_txt_file_as_str(CONTEXT_PROMPT_FILE)
-    context_prompt = context_prompt.replace('###USER_PROMPT###', user_prompt)
-    context_prompt = context_prompt.replace('###CONTEXT###', relevant_docs_str)
-    context_prompt_log_file = log_prompt(context_prompt, 'context_prompt')
-    # gpt completion 
-    text, response = gpt3_text_completion(context_prompt, GPT3_MODEL, max_tokens=MAX_TOKENS)
-    response_prompt_log_file = log_prompt(text, 'final_response')
-    print('\n\n\nBOT RESPONSE:\n', text)
+    
        
