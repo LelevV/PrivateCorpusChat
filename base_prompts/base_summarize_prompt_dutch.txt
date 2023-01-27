@@ -1,0 +1,15 @@
+Maak notities om de volgende vraag zo goed mogelijk te kunnen beantwoorden: 
+
+
+###USER_PROMPT###
+
+
+Maak notities om bovenstaande vraag te beantwoorden van de volgende tekst:
+
+
+
+###CONTENT###
+
+
+
+Notities:
