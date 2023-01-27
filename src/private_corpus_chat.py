@@ -182,7 +182,6 @@ def get_query_summary(content, user_prompt, model, summary_prompt):
 
 
 if __name__ == '__main__':
-
     # global vars
     TOP_N_RETRIEVAL = 3
     GPT3_MODEL = 'text-davinci-003'
@@ -197,8 +196,6 @@ if __name__ == '__main__':
     # prompt files 
     CONTEXT_PROMPT_FILE = '..//base_prompts//base_context_prompt_dutch.txt'
     SUMMARY_PROMPT_FILE = '..//base_prompts//base_summarize_prompt_dutch.txt'
-
-    ### check if corpus is present and processed 
 
     # check if raw_files is empty
     assert len(os.listdir(CORPUS_RAW_DIR)) > 0, f'No corpus present in the {CORPUS_RAW_DIR} folder!'
@@ -233,21 +230,25 @@ if __name__ == '__main__':
     relevant_docs_str = [get_txt_file_as_str(CORPUS_PROCESSED_DIR+file) for file in relevant_docs]
     relevant_docs_str = '\n'.join(relevant_docs_str) 
 
+    ### Summarize if context is too long
     if len(relevant_docs_str) > MAX_CONTEXT_LENGTH:
         print('Context is too long; summarize...\n')
         # summarize relevant docs 
+        print(f'Context summary:')
         relevant_docs_str = []
         for file in relevant_docs:
             file_str = get_txt_file_as_str(CORPUS_PROCESSED_DIR+file)
             file_summary = get_query_summary(file_str, user_prompt, GPT3_MODEL, SUMMARY_PROMPT_FILE)
             context_prompt_log_file = log_prompt(file_summary, "summary_response", extra_info_dict={'user_prompt':user_prompt})
             relevant_docs_str.append(file_summary)
+            print(f"\nSOURCE]: {file}")
+            print(file_summary, '/n')
         relevant_docs_str = '\n'.join(relevant_docs_str)
-        print(f'Context summary: {relevant_docs_str} \n\n')
+        
     else:
         print(f'Context: {relevant_docs_str} \n\n')
 
-    # generate prompt with context
+    ### Generate prompt with context
     context_prompt = get_txt_file_as_str(CONTEXT_PROMPT_FILE)
     context_prompt = context_prompt.replace('###USER_PROMPT###', user_prompt)
     context_prompt = context_prompt.replace('###CONTEXT###', relevant_docs_str)
@@ -255,5 +256,5 @@ if __name__ == '__main__':
     # gpt completion 
     text, response = gpt3_text_completion(context_prompt, GPT3_MODEL, max_tokens=MAX_TOKENS)
     response_prompt_log_file = log_prompt(text, 'final_response')
-    print('\n\n\nBOT:\n', text)
+    print('\n\n\nBOT RESPONSE:\n', text)
        
