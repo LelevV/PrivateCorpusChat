@@ -1,9 +1,9 @@
-# PrivateCorpusChat
-A GPT based command-line tool using the OpenAI API to ask a question about your private corpus.
+# PrivateCorpusChat (Dutch)
+A GPT based command-line tool using the OpenAI API to ask a question about your (Dutch) private corpus.
 
 ## How it works 
 ### Once 
-1. Files from your private corpus are split up into chunks that are small enough to generate embeddings.
+1. Files from your private corpus are split up into chunks that are small enough to generate embeddings
 2. A embedding index is created from the chunked files 
 ### Per question
 1. A prompt/question is given by the user 
