@@ -1,0 +1,8 @@
+name: PCC
+dependencies:
+  - numpy=1.23.5
+  - pandas=1.5.2
+  - pip
+  - pip:
+      - openai==0.26.4
+      - pyfiglet==0.8.post1

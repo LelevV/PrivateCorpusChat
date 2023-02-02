@@ -6,6 +6,7 @@ import json
 import pyfiglet
 import os
 import datetime
+import time
 
 
 def get_txt_file_as_str(file):
@@ -41,9 +42,9 @@ def chunk_text(text, chunk_word_size=500):
 
 def process_raw_files():
     """Process the .txt files in the raw_files folder to workable chunks."""
-    raw_data_dir = '..//corpus//raw_files//'
+    raw_data_dir = 'corpus//raw_files//'
     raw_files = os.listdir(raw_data_dir)
-    processed_dir = '..//corpus//processed//'
+    processed_dir = 'corpus//processed//'
     for raw_file in raw_files:
         if raw_file[-4:] == '.txt':
             # read file as str
@@ -75,10 +76,13 @@ def get_cosine_sim(x, y):
 
 
 def create_embedding_index():
-    """write embeddings to json for all processed files"""
-    # TODO: implement rate limit (default OpenAI is 60/min)
-    processed_dir = '..//corpus//processed//'
-    embedding_index_dir = '..//corpus//embedding_index//'
+    """write embeddings to json for all processed files
+        - call sleep(1) if more then 60 files to prevent rate limit of 60/minute 
+        of openai api 
+    
+    """
+    processed_dir = 'corpus//processed//'
+    embedding_index_dir = 'corpus//embedding_index//'
     text_files = os.listdir(processed_dir)
     embedding_files = os.listdir(embedding_index_dir)
     for file in text_files:
@@ -96,6 +100,9 @@ def create_embedding_index():
             'embedding':embedding
         }
         write_dict_to_json_file(embedding_index_dir+json_name, embedding_dict)
+        # rate limit of 60 calls per minute 
+        if len(text_files) > 60:
+            time.sleep(1.5)
 
 
 def gpt3_text_completion(prompt, model, max_tokens=60):
@@ -119,7 +126,7 @@ def gpt3_text_completion(prompt, model, max_tokens=60):
 
 
 def log_prompt(prompt, prompt_type, add_embedding=False, extra_info_dict=None):
-    log_dir = '..//logs//'
+    log_dir = 'logs//'
     dt_str = str(datetime.datetime.now())
     log_i = 0
     log_i = len(os.listdir(log_dir))
@@ -281,13 +288,13 @@ if __name__ == '__main__':
     MAX_CONTEXT_LENGTH = 3000
     
     # corpus files 
-    CORPUS_EMBEDDING_DIR = '..//corpus//embedding_index//'
-    CORPUS_PROCESSED_DIR = '..//corpus//processed//'
-    CORPUS_RAW_DIR = '..//corpus//raw_files//'
+    CORPUS_EMBEDDING_DIR = 'corpus//embedding_index//'
+    CORPUS_PROCESSED_DIR = 'corpus//processed//'
+    CORPUS_RAW_DIR = 'corpus//raw_files//'
 
     # prompt files 
-    CONTEXT_PROMPT_FILE = '..//base_prompts//base_context_prompt_dutch.txt'
-    SUMMARY_PROMPT_FILE = '..//base_prompts//base_summarize_prompt_dutch.txt'
+    CONTEXT_PROMPT_FILE = 'base_prompts//base_context_prompt_dutch.txt'
+    SUMMARY_PROMPT_FILE = 'base_prompts//base_summarize_prompt_dutch.txt'
 
     # check if raw_files is empty
     assert len(os.listdir(CORPUS_RAW_DIR)) > 0, f'No corpus present in the {CORPUS_RAW_DIR} folder!'
@@ -301,6 +308,7 @@ if __name__ == '__main__':
     # check embedding_index is present, otherwise; generate 
     if len(os.listdir(CORPUS_EMBEDDING_DIR)) == 0:
         print('\nNo embedding index. Start creating index...')
+        print('Can take a while. If you run into a rate limit error from OpenAI, run program again!')
         create_embedding_index()
         print('Done creating embedding index!\n')
     
