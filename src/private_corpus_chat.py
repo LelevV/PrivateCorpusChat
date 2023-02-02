@@ -182,6 +182,16 @@ def get_query_summary(content, user_prompt, model, summary_prompt):
         return summary
 
 
+def summarize_multiple_docs(docs, user_prompt):
+    relevant_docs_str = []
+    for file in docs:
+        file_str = get_txt_file_as_str(CORPUS_PROCESSED_DIR+file)
+        file_summary = get_query_summary(file_str, user_prompt, GPT3_MODEL, SUMMARY_PROMPT_FILE)
+        context_prompt_log_file = log_prompt(file_summary, "summary_response", extra_info_dict={'user_prompt':user_prompt})
+        relevant_docs_str.append(file_summary)
+    return relevant_docs_str
+
+
 def list_files(startpath):
     """To print all files in a directory"""
     for root, dirs, files in os.walk(startpath):
@@ -236,16 +246,13 @@ def ask_question():
         print('Context is too long; summarize...\n')
         # summarize relevant docs 
         print(f'Context summary:')
-        relevant_docs_str = []
-        for i, file in enumerate(relevant_docs, start=1):
-            file_str = get_txt_file_as_str(CORPUS_PROCESSED_DIR+file)
-            file_summary = get_query_summary(file_str, user_prompt, GPT3_MODEL, SUMMARY_PROMPT_FILE)
-            context_prompt_log_file = log_prompt(file_summary, "summary_response", extra_info_dict={'user_prompt':user_prompt})
-            relevant_docs_str.append(file_summary)
-            print(f"\n({i}/{len(relevant_docs)}) [Notes of relevant (chunk) file] {file}:")
+        relevant_docs_summs = summarize_multiple_docs(relevant_docs, user_prompt)
+        i = 1
+        for file, file_summary in zip(relevant_docs, relevant_docs_summs):
+            print(f"\n{i}/{len(relevant_docs)} Notes of {file}:")
             print(file_summary.strip(), '/n')
-        relevant_docs_str = '\n'.join(relevant_docs_str)
-        
+            i+=1
+        relevant_docs_str = '\n'.join(relevant_docs_summs)
     else:
         print(f'Context: {relevant_docs_str} \n\n')
 
