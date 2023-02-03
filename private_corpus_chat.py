@@ -1,55 +1,46 @@
-import json
-import os
+"""Main PrivateCorpusChat program"""
+
 import datetime
 import time
-import numpy as np
-from numpy.linalg import norm
 import pandas as pd
-import openai
 import pyfiglet
+from src.utils import (os_list_dir_filetype,
+                       get_txt_file_as_str,
+                       get_json_file_as_dict,
+                       write_str_to_txt_file,
+                       write_dict_to_json_file,
+                       list_files)
+from src.nlp import (chunk_text,
+                     get_embedding,
+                     get_cosine_sim,
+                     get_query_summary,
+                     gpt3_text_completion)
 
 
-def os_list_dir_filetype(directory: str, file_type: str) -> list:
-    """Return the files of file_type using os.listdir()"""
-    files = [i for i in os.listdir(directory) if i.lower().endswith(file_type)]
-    return files
+def log_prompt(prompt: str, prompt_type: str, add_embedding=False, extra_info_dict=None) -> str:
+    """Log a prompt as JSON in the logs// folder."""
+    log_dir = 'logs//'
+    dt_str = str(datetime.datetime.now())
+    log_i = 0  
+    log_i = len(os_list_dir_filetype(log_dir, '.json'))
+    json_name = f'log_entry__{prompt_type}__{log_i}.json'
+    d = {
+        'creation_dt':dt_str,
+        'prompt_type':prompt_type, 
+        'prompt':prompt,
+        'file_name':json_name,
+        }
+    if add_embedding: # only add embedding if specified
+        d['embedding'] = get_embedding(prompt)
 
+    # add extra info to d, if given 
+    if extra_info_dict:
+        for k in extra_info_dict:
+            d[k] = extra_info_dict[k]
 
-def get_txt_file_as_str(file: str) -> str:
-    """Read file and return as str."""
-    with open(file, 'r', encoding='utf-8') as f:
-        string = f.read()
-    return string 
-
-
-def write_str_to_txt_file(file_string: str, file_name: str) -> None:
-    """Write file_string to file_name."""
-    with open(file_name, 'w', encoding='utf-8') as f:
-        f.write(file_string)
-
-
-def get_json_file_as_dict(file: str) -> dict:
-    """Return JSON file as dict."""
-    assert file[-5:].lower() == '.json', f'{file} is not a JSON file.'
-    with open(file, 'r', encoding='utf-8') as f:
-        d = json.load(f)
-        return d
-
-
-def write_dict_to_json_file(file: str, data: dict) -> None:
-    """Write data to file asn a JSON file."""
-    with open(file, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, sort_keys=True, indent=2)
-
-
-def chunk_text(text: str, chunk_word_size=500) -> list:
-    """Chunk text into chunks of size chunk_word_size."""
-    # to avoid splitting within a word, create chunks on words list
-    words = text.split(' ')
-    chunks_words = [words[i:i+chunk_word_size] for i in range(0, len(words), chunk_word_size)]
-    # transform back to strings
-    chuncks_text = [' '.join(words) for words in chunks_words]
-    return chuncks_text
+    log_file_name = log_dir+json_name
+    write_dict_to_json_file(log_file_name, d)
+    return log_file_name
 
 
 def process_raw_files() -> None:
@@ -67,24 +58,6 @@ def process_raw_files() -> None:
         for i, chunk in enumerate(chunks, start=1):
             chunk_name = f'{raw_file[:-4]}__chunk_{i}_{n_chunks}.txt'
             write_str_to_txt_file(chunk, processed_dir+chunk_name)
-
-
-def get_embedding(text: str) -> list:
-    """Generate embedding for text using OpenAI ada api."""
-     # to avoid using chars that GPT doesnt like
-    text = text.encode(encoding='ASCII', errors='ignore').decode()
-    response = openai.Embedding.create(
-        input=text,
-        model="text-embedding-ada-002"
-    )
-    embeddings = response['data'][0]['embedding']
-    return embeddings
-
-
-def get_cosine_sim(x_vector, y_vector) -> float:
-    """Get the cosine simularity of two vectors."""
-    cosine_sim = np.dot(x_vector, y_vector)/(norm(x_vector)*norm(y_vector))
-    return cosine_sim
 
 
 def create_embedding_index() -> None:
@@ -118,53 +91,6 @@ def create_embedding_index() -> None:
             time.sleep(1.5)
 
 
-def gpt3_text_completion(prompt: str, model: str, max_tokens=60) -> tuple:
-    """complete the prompt using the OpenAI API using a GPT-3 model."""
-    # check if valid model
-    gpt3_models = ['text-davinci-003', 'text-curie-001', 'text-babbage-001', 'text-ada-001']
-    assert model in gpt3_models, 'Not a valid model!'
-    # to avoid using chars that GPT doesnt like
-    prompt = prompt.encode(encoding='ASCII', errors='ignore').decode()
-    # prompt model via api call
-    response = openai.Completion.create(
-        model=model,
-        prompt=prompt,
-        temperature=0.7,
-        max_tokens=max_tokens,
-        top_p=1.0,
-        frequency_penalty=0.0,
-        presence_penalty=1
-    )
-    text = response['choices'][0]['text']
-    return text, response
-
-
-def log_prompt(prompt: str, prompt_type: str, add_embedding=False, extra_info_dict=None) -> str:
-    """Log a prompt as JSON in the logs// folder."""
-    log_dir = 'logs//'
-    dt_str = str(datetime.datetime.now())
-    log_i = 0  
-    log_i = len(os_list_dir_filetype(log_dir, '.json'))
-    json_name = f'log_entry__{prompt_type}__{log_i}.json'
-    d = {
-        'creation_dt':dt_str,
-        'prompt_type':prompt_type, 
-        'prompt':prompt,
-        'file_name':json_name,
-        }
-    if add_embedding: # only add embedding if specified
-        d['embedding'] = get_embedding(prompt)
-
-    # add extra info to d, if given 
-    if extra_info_dict:
-        for k in extra_info_dict:
-            d[k] = extra_info_dict[k]
-
-    log_file_name = log_dir+json_name
-    write_dict_to_json_file(log_file_name, d)
-    return log_file_name
-
-
 def retrieve_top_n_simular_docs(prompt_log_file: str,
                                 corpus_embedding_dir: str,
                                 top_n: int) -> list:
@@ -193,21 +119,6 @@ def retrieve_top_n_simular_docs(prompt_log_file: str,
     return top_n_docs
 
 
-def get_query_summary(content: str, user_prompt: str, model: str, summary_prompt: str) -> str:
-    """
-    Summarize and retrieve txt based on given user_prompt and summarization prompt 
-    and write result to summary dir.
-    """
-    summary_prompt = get_txt_file_as_str(summary_prompt)
-    summary_prompt = summary_prompt.replace('###USER_PROMPT###', user_prompt)
-    summary_prompt = summary_prompt.replace('###CONTENT###', content)
-    # log prompt
-    _ = log_prompt(summary_prompt, 'summary_prompt')
-    # completion
-    summary, _ = gpt3_text_completion(summary_prompt, model, max_tokens=300)
-    return summary
-
-
 def summarize_multiple_docs(docs: list, user_prompt: str) -> list:
     """
     Given a list of document files, summarize using the user prompt
@@ -219,18 +130,9 @@ def summarize_multiple_docs(docs: list, user_prompt: str) -> list:
         file_summary = get_query_summary(file_str, user_prompt, GPT3_MODEL, SUMMARY_PROMPT_FILE)
         _ = log_prompt(file_summary, "summary_response", extra_info_dict={'user_prompt':user_prompt})
         relevant_docs_summs.append(file_summary)
+        # log prompt
+        _ = log_prompt(file_summary, 'summary_prompt')
     return relevant_docs_summs
-
-
-def list_files(startpath: str) -> None:
-    """Pretty print all files in a directory"""
-    for root, _, files in os.walk(startpath):
-        level = root.replace(startpath, '').count(os.sep)
-        indent = ' ' * 4 * (level)
-        print(f'{indent}{os.path.basename(root)}/')
-        subindent = ' ' * 4 * (level + 1)
-        for f in files:
-            print(f'{subindent}{f}')
 
 
 def ask_question() -> None:
