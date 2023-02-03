@@ -9,6 +9,12 @@ import openai
 import pyfiglet
 
 
+def os_list_dir_filetype(directory: str, file_type: str) -> list:
+    """Return the files of file_type using os.listdir()"""
+    files = [i for i in os.listdir(directory) if i.lower().endswith(file_type)]
+    return files
+
+
 def get_txt_file_as_str(file: str) -> str:
     """Read file and return as str."""
     with open(file, 'r', encoding='utf-8') as f:
@@ -24,6 +30,7 @@ def write_str_to_txt_file(file_string: str, file_name: str) -> None:
 
 def get_json_file_as_dict(file: str) -> dict:
     """Return JSON file as dict."""
+    assert file[-5:].lower() == '.json', f'{file} is not a JSON file.'
     with open(file, 'r', encoding='utf-8') as f:
         d = json.load(f)
         return d
@@ -40,27 +47,26 @@ def chunk_text(text: str, chunk_word_size=500) -> list:
     # to avoid splitting within a word, create chunks on words list
     words = text.split(' ')
     chunks_words = [words[i:i+chunk_word_size] for i in range(0, len(words), chunk_word_size)]
-    # transform back to strings 
+    # transform back to strings
     chuncks_text = [' '.join(words) for words in chunks_words]
-    return chuncks_text 
+    return chuncks_text
 
 
 def process_raw_files() -> None:
     """Process the .txt files in the raw_files folder to workable chunks."""
     raw_data_dir = 'corpus//raw_files//'
-    raw_files = os.listdir(raw_data_dir)
+    raw_files = os_list_dir_filetype(raw_data_dir, '.txt')
     processed_dir = 'corpus//processed//'
     for raw_file in raw_files:
-        if raw_file[-4:] == '.txt':
-            # read file as str
-            file_str = get_txt_file_as_str(raw_data_dir+raw_file)
-            # chunk str into substrings of 500 tokens
-            chunks = chunk_text(file_str)
-            # write chunks to files in processed folder
-            n_chunks = len(chunks)
-            for i, chunk in enumerate(chunks, start=1):
-                chunk_name = f'{raw_file[:-4]}__chunk_{i}_{n_chunks}.txt'
-                write_str_to_txt_file(chunk, processed_dir+chunk_name) 
+        # read file as str
+        file_str = get_txt_file_as_str(raw_data_dir+raw_file)
+        # chunk str into substrings of 500 tokens
+        chunks = chunk_text(file_str)
+        # write chunks to files in processed folder
+        n_chunks = len(chunks)
+        for i, chunk in enumerate(chunks, start=1):
+            chunk_name = f'{raw_file[:-4]}__chunk_{i}_{n_chunks}.txt'
+            write_str_to_txt_file(chunk, processed_dir+chunk_name)
 
 
 def get_embedding(text: str) -> list:
@@ -89,8 +95,9 @@ def create_embedding_index() -> None:
     """
     processed_dir = 'corpus//processed//'
     embedding_index_dir = 'corpus//embedding_index//'
-    text_files = os.listdir(processed_dir)
-    embedding_files = os.listdir(embedding_index_dir)
+
+    text_files = os_list_dir_filetype(processed_dir, '.json')
+    embedding_files = os_list_dir_filetype(embedding_index_dir, '.json')
     for file in text_files:
         # check if files were already embedded
         json_name = f'{file[:-4]}_embedding.json'
@@ -136,8 +143,8 @@ def log_prompt(prompt: str, prompt_type: str, add_embedding=False, extra_info_di
     """Log a prompt as JSON in the logs// folder."""
     log_dir = 'logs//'
     dt_str = str(datetime.datetime.now())
-    log_i = 0
-    log_i = len(os.listdir(log_dir))
+    log_i = 0  
+    log_i = len(os_list_dir_filetype(log_dir, '.json'))
     json_name = f'log_entry__{prompt_type}__{log_i}.json'
     d = {
         'creation_dt':dt_str,
@@ -168,7 +175,7 @@ def retrieve_top_n_simular_docs(prompt_log_file: str,
 
     # get query simularity for all files in corpus embedding dir
     simularities = [] # [doc_embedding_source_file, simularity]
-    docs_embedding_files = os.listdir(corpus_embedding_dir)
+    docs_embedding_files = os_list_dir_filetype(corpus_embedding_dir, '.json')
     for doc_embedding_file in docs_embedding_files:
         # load doc data
         doc_embedding_dict = get_json_file_as_dict(corpus_embedding_dir+doc_embedding_file)
@@ -308,23 +315,23 @@ if __name__ == '__main__':
     SUMMARY_PROMPT_FILE = 'base_prompts//base_summarize_prompt_dutch.txt'
 
     # check if raw_files is empty
-    assert len(os.listdir(CORPUS_RAW_DIR)) > 0, f'No corpus present in the {CORPUS_RAW_DIR} folder!'
+    assert len(os_list_dir_filetype(CORPUS_RAW_DIR, '.txt')) > 0, f'No corpus present in the {CORPUS_RAW_DIR} folder!'
 
     # check if processed files are present, otherwise start processing 
-    if len(os.listdir(CORPUS_PROCESSED_DIR)) == 0:
+    if len(os_list_dir_filetype(CORPUS_PROCESSED_DIR, '.txt')) == 0:
         print('\nNo processed files. Start processing...')
         process_raw_files()
         print('Done processing!\n')
 
     # check embedding_index is present, otherwise; generate 
-    if len(os.listdir(CORPUS_EMBEDDING_DIR)) == 0:
+    if len(os_list_dir_filetype(CORPUS_EMBEDDING_DIR, '.json')) == 0:
         print('\nNo embedding index. Start creating index...')
         print('Can take a while. If you run into a rate limit error from OpenAI, run program again!')
         create_embedding_index()
         print('Done creating embedding index!\n')
     
     # check if embedding_index is complete, otherwise; generate remainging
-    if len(os.listdir(CORPUS_EMBEDDING_DIR)) < len(os.listdir(CORPUS_PROCESSED_DIR)):
+    if len(os_list_dir_filetype(CORPUS_EMBEDDING_DIR, '.json')) < len(os_list_dir_filetype(CORPUS_PROCESSED_DIR, '.txt')):
         print('\nEmbedding index not complete. Finish index...')
         create_embedding_index()
         print('Done creating embedding index!\n')
