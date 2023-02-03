@@ -1,0 +1,1 @@
+Folder to store the private corpus as txt files.

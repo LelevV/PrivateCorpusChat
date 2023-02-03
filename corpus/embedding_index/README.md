@@ -1,0 +1,1 @@
+Folder to store the embedding index as json files.

@@ -1,0 +1,1 @@
+Folder to store the processed chunks as txt files.
