@@ -1,37 +1,42 @@
-import openai
-import numpy as np
-import pandas as pd
-from numpy.linalg import norm
 import json
-import pyfiglet
 import os
 import datetime
 import time
+import numpy as np
+from numpy.linalg import norm
+import pandas as pd
+import openai
+import pyfiglet
 
 
-def get_txt_file_as_str(file):
+def get_txt_file_as_str(file: str) -> str:
+    """Read file and return as str."""
     with open(file, 'r', encoding='utf-8') as f:
         string = f.read()
     return string 
 
 
-def write_str_to_txt_file(file_string, file_name):
+def write_str_to_txt_file(file_string: str, file_name: str) -> None:
+    """Write file_string to file_name."""
     with open(file_name, 'w', encoding='utf-8') as f:
         f.write(file_string)
 
 
-def get_json_file_as_dict(file):
+def get_json_file_as_dict(file: str) -> dict:
+    """Return JSON file as dict."""
     with open(file, 'r', encoding='utf-8') as f:
         d = json.load(f)
         return d
 
 
-def write_dict_to_json_file(file, data):
+def write_dict_to_json_file(file: str, data: dict) -> None:
+    """Write data to file asn a JSON file."""
     with open(file, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, sort_keys=True, indent=2)
 
 
-def chunk_text(text, chunk_word_size=500):
+def chunk_text(text: str, chunk_word_size=500) -> list:
+    """Chunk text into chunks of size chunk_word_size."""
     # to avoid splitting within a word, create chunks on words list
     words = text.split(' ')
     chunks_words = [words[i:i+chunk_word_size] for i in range(0, len(words), chunk_word_size)]
@@ -40,7 +45,7 @@ def chunk_text(text, chunk_word_size=500):
     return chuncks_text 
 
 
-def process_raw_files():
+def process_raw_files() -> None:
     """Process the .txt files in the raw_files folder to workable chunks."""
     raw_data_dir = 'corpus//raw_files//'
     raw_files = os.listdir(raw_data_dir)
@@ -58,8 +63,8 @@ def process_raw_files():
                 write_str_to_txt_file(chunk, processed_dir+chunk_name) 
 
 
-def get_embedding(text):
-    """Generate embedding for text using OpenAI ada api"""
+def get_embedding(text: str) -> list:
+    """Generate embedding for text using OpenAI ada api."""
      # to avoid using chars that GPT doesnt like
     text = text.encode(encoding='ASCII', errors='ignore').decode()
     response = openai.Embedding.create(
@@ -70,16 +75,17 @@ def get_embedding(text):
     return embeddings
 
 
-def get_cosine_sim(x, y):
-    cosine_sim = np.dot(x,y)/(norm(x)*norm(y))
+def get_cosine_sim(x_vector, y_vector) -> float:
+    """Get the cosine simularity of two vectors."""
+    cosine_sim = np.dot(x_vector, y_vector)/(norm(x_vector)*norm(y_vector))
     return cosine_sim
 
 
-def create_embedding_index():
-    """write embeddings to json for all processed files
-        - call sleep(1) if more then 60 files to prevent rate limit of 60/minute 
-        of openai api 
-    
+def create_embedding_index() -> None:
+    """
+    write embeddings to json for all processed files
+        - call sleep(1) if more then 60 files to prevent rate limit of 60/minute
+            of openai api.
     """
     processed_dir = 'corpus//processed//'
     embedding_index_dir = 'corpus//embedding_index//'
@@ -90,7 +96,7 @@ def create_embedding_index():
         json_name = f'{file[:-4]}_embedding.json'
         if json_name in embedding_files:
             # embedding file already exists
-            continue 
+            continue
         text = get_txt_file_as_str(processed_dir+file)
         embedding = get_embedding(text)
         embedding_dict = {
@@ -105,7 +111,8 @@ def create_embedding_index():
             time.sleep(1.5)
 
 
-def gpt3_text_completion(prompt, model, max_tokens=60):
+def gpt3_text_completion(prompt: str, model: str, max_tokens=60) -> tuple:
+    """complete the prompt using the OpenAI API using a GPT-3 model."""
     # check if valid model
     gpt3_models = ['text-davinci-003', 'text-curie-001', 'text-babbage-001', 'text-ada-001']
     assert model in gpt3_models, 'Not a valid model!'
@@ -122,10 +129,11 @@ def gpt3_text_completion(prompt, model, max_tokens=60):
         presence_penalty=1
     )
     text = response['choices'][0]['text']
-    return text, response 
+    return text, response
 
 
-def log_prompt(prompt, prompt_type, add_embedding=False, extra_info_dict=None):
+def log_prompt(prompt: str, prompt_type: str, add_embedding=False, extra_info_dict=None) -> str:
+    """Log a prompt as JSON in the logs// folder."""
     log_dir = 'logs//'
     dt_str = str(datetime.datetime.now())
     log_i = 0
@@ -137,9 +145,9 @@ def log_prompt(prompt, prompt_type, add_embedding=False, extra_info_dict=None):
         'prompt':prompt,
         'file_name':json_name,
         }
-    if add_embedding: # only add embedding if specified 
+    if add_embedding: # only add embedding if specified
         d['embedding'] = get_embedding(prompt)
-    
+
     # add extra info to d, if given 
     if extra_info_dict:
         for k in extra_info_dict:
@@ -150,8 +158,11 @@ def log_prompt(prompt, prompt_type, add_embedding=False, extra_info_dict=None):
     return log_file_name
 
 
-def retrieve_top_n_simular_docs(prompt_log_file, corpus_embedding_dir, top_n):
-    # load prompt data 
+def retrieve_top_n_simular_docs(prompt_log_file: str,
+                                corpus_embedding_dir: str,
+                                top_n: int) -> list:
+    """Given a prompt, retrieve the top_n simular documents using the embedding index."""
+    # load prompt data
     prompt_dict = get_json_file_as_dict(prompt_log_file)
     prompt_embedding_vector = prompt_dict['embedding']
 
@@ -163,7 +174,7 @@ def retrieve_top_n_simular_docs(prompt_log_file, corpus_embedding_dir, top_n):
         doc_embedding_dict = get_json_file_as_dict(corpus_embedding_dir+doc_embedding_file)
         doc_embedding_source_file = doc_embedding_dict['source_file']
         doc_embedding_vector = doc_embedding_dict['embedding']
-        doc_embedding_text = doc_embedding_dict['source_text']
+        _ = doc_embedding_dict['source_text']
         # get simularity
         simularity = get_cosine_sim(prompt_embedding_vector, doc_embedding_vector)
         simularities.append([doc_embedding_source_file, simularity])
@@ -175,55 +186,58 @@ def retrieve_top_n_simular_docs(prompt_log_file, corpus_embedding_dir, top_n):
     return top_n_docs
 
 
-def get_query_summary(content, user_prompt, model, summary_prompt):
-        """Summarize and retrieve txt based on given user_prompt and summarization prompt 
-        and write result to summary dir
-        """
-        summary_prompt = get_txt_file_as_str(summary_prompt)
-        summary_prompt = summary_prompt.replace('###USER_PROMPT###', user_prompt)
-        summary_prompt = summary_prompt.replace('###CONTENT###', content)
-        # log prompt 
-        summary_prompt_log_file = log_prompt(summary_prompt, 'summary_prompt')
-        # completion
-        summary, response = gpt3_text_completion(summary_prompt, model, max_tokens=300)
-        return summary
+def get_query_summary(content: str, user_prompt: str, model: str, summary_prompt: str) -> str:
+    """
+    Summarize and retrieve txt based on given user_prompt and summarization prompt 
+    and write result to summary dir.
+    """
+    summary_prompt = get_txt_file_as_str(summary_prompt)
+    summary_prompt = summary_prompt.replace('###USER_PROMPT###', user_prompt)
+    summary_prompt = summary_prompt.replace('###CONTENT###', content)
+    # log prompt
+    _ = log_prompt(summary_prompt, 'summary_prompt')
+    # completion
+    summary, _ = gpt3_text_completion(summary_prompt, model, max_tokens=300)
+    return summary
 
 
-def summarize_multiple_docs(docs, user_prompt):
-    relevant_docs_str = []
+def summarize_multiple_docs(docs: list, user_prompt: str) -> list:
+    """
+    Given a list of document files, summarize using the user prompt
+    and return as a list with the summaries.
+    """
+    relevant_docs_summs = []
     for file in docs:
         file_str = get_txt_file_as_str(CORPUS_PROCESSED_DIR+file)
         file_summary = get_query_summary(file_str, user_prompt, GPT3_MODEL, SUMMARY_PROMPT_FILE)
-        context_prompt_log_file = log_prompt(file_summary, "summary_response", extra_info_dict={'user_prompt':user_prompt})
-        relevant_docs_str.append(file_summary)
-    return relevant_docs_str
+        _ = log_prompt(file_summary, "summary_response", extra_info_dict={'user_prompt':user_prompt})
+        relevant_docs_summs.append(file_summary)
+    return relevant_docs_summs
 
 
-def list_files(startpath):
-    """To print all files in a directory"""
-    for root, dirs, files in os.walk(startpath):
+def list_files(startpath: str) -> None:
+    """Pretty print all files in a directory"""
+    for root, _, files in os.walk(startpath):
         level = root.replace(startpath, '').count(os.sep)
         indent = ' ' * 4 * (level)
-        print('{}{}/'.format(indent, os.path.basename(root)))
+        print(f'{indent}{os.path.basename(root)}/')
         subindent = ' ' * 4 * (level + 1)
         for f in files:
-            print('{}{}'.format(subindent, f))
+            print(f'{subindent}{f}')
 
 
-def ask_question():
-    ### For now only one question:
-    
+def ask_question() -> None:
+    """
+    Ask a question (via user prompt) about your private corpus, as it is stored in .txt files
+    in the /corpus/raw_files folder.
+    """
     logo_banner = pyfiglet.figlet_format('Private Corpus Search')
     print(logo_banner)
-    
-    print(''' 
-    --------------------------------------------------------------
+    print(''' --------------------------------------------------------------
     ------ Ask a question about your private text corpus!!! ------
     --------------------------------------------------------------     
 
-    '''
-    )
-
+    ''')
     print('Your private corpus contains the following files:')
     list_files(CORPUS_RAW_DIR)
 
@@ -252,7 +266,7 @@ def ask_question():
         print(summarize_banner)
         print('Context is too long; summarize...\n')
         # summarize relevant docs 
-        print(f'Context summary:')
+        print('Context summary:')
         relevant_docs_summs = summarize_multiple_docs(relevant_docs, user_prompt)
         i = 1
         for file, file_summary in zip(relevant_docs, relevant_docs_summs):
@@ -267,10 +281,10 @@ def ask_question():
     context_prompt = get_txt_file_as_str(CONTEXT_PROMPT_FILE)
     context_prompt = context_prompt.replace('###USER_PROMPT###', user_prompt)
     context_prompt = context_prompt.replace('###CONTEXT###', relevant_docs_str)
-    context_prompt_log_file = log_prompt(context_prompt, 'context_prompt')
-    # gpt completion 
-    text, response = gpt3_text_completion(context_prompt, GPT3_MODEL, max_tokens=MAX_TOKENS)
-    response_prompt_log_file = log_prompt(text, 'final_response')
+    _ = log_prompt(context_prompt, 'context_prompt')
+    # gpt completion
+    text, _ = gpt3_text_completion(context_prompt, GPT3_MODEL, max_tokens=MAX_TOKENS)
+    _ = log_prompt(text, 'final_response')
 
     print()
     response_banner = pyfiglet.figlet_format('Response')
@@ -279,19 +293,16 @@ def ask_question():
     print('\nAnswer:\n\n', text.strip())
 
 
-
 if __name__ == '__main__':
     # global vars
     TOP_N_RETRIEVAL = 3
     GPT3_MODEL = 'text-davinci-003'
     MAX_TOKENS = 500
     MAX_CONTEXT_LENGTH = 3000
-    
-    # corpus files 
+    # corpus files
     CORPUS_EMBEDDING_DIR = 'corpus//embedding_index//'
     CORPUS_PROCESSED_DIR = 'corpus//processed//'
     CORPUS_RAW_DIR = 'corpus//raw_files//'
-
     # prompt files 
     CONTEXT_PROMPT_FILE = 'base_prompts//base_context_prompt_dutch.txt'
     SUMMARY_PROMPT_FILE = 'base_prompts//base_summarize_prompt_dutch.txt'
