@@ -30,4 +30,4 @@ A simple GPT-3 based command-line tool using the OpenAI API to ask a question ab
 ![Summarize](/images/summarize.png "Summarize")
 
 ### The program generates an answer by incorporating the summaries from the previous step into the final user prompt.
-![Response](/images/summarize.png "Response")
+![Response](/images/response.png "Response")
