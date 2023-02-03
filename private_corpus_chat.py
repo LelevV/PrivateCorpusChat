@@ -179,7 +179,7 @@ def ask_question() -> None:
         relevant_docs_summs = summarize_multiple_docs(relevant_docs, user_prompt)
         i = 1
         for file, file_summary in zip(relevant_docs, relevant_docs_summs):
-            print(f"\n{i}/{len(relevant_docs)} Notes of {file}:")
+            print(f"\n############# {i}/{len(relevant_docs)} Notes of {file}:")
             print(file_summary.strip(), '/n')
             i+=1
         relevant_docs_str = '\n'.join(relevant_docs_summs)

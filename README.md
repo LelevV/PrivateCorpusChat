@@ -1,5 +1,5 @@
 # PrivateCorpusChat (Dutch)
-A GPT based command-line tool using the OpenAI API to ask a question about your (Dutch) private corpus.
+A simple GPT-3 based command-line tool using the OpenAI API to ask a question about your (Dutch) private corpus. The base-prompts are for now only formulated in Dutch.
 
 ## How it works 
 ### Once 
@@ -14,6 +14,20 @@ A GPT based command-line tool using the OpenAI API to ask a question about your 
 
 ## Usage 
 1. Create conda env: conda env create -f environment.yml
-2. Fill the corpus//raw_files folder with your private corpus (for now only .txt files work)
-3. Run private_corpus_chat.py 
+2. Make sure that you set your OpenAI API secret key to the 'OPENAI_API_KEY' environment variable ([link](https://help.openai.com/en/articles/5112595-best-practices-for-api-key-safety)).
+3. Fill the corpus//raw_files folder with your private corpus (for now only .txt files work)
+4. Run private_corpus_chat.py 
 
+
+## Example
+### Ask a question about your private corpus (in this case the 'algemene deel van de WFT')
+![Question](/images/intro.png "Question")
+
+### The program retrieves top N chunks of text for the corpus (3 docs is the default)
+![Retrieve](/images/retrieve.png "Retrieve")
+
+### The program summarizes the chunks retrieved in the previous step
+![Summarize](/images/summarize.png "Summarize")
+
+### The program generates an answer by incorporating the summaries from the previous step into the final user prompt.
+![Response](/images/summarize.png "Response")

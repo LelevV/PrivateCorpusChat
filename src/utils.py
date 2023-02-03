@@ -37,12 +37,20 @@ def write_dict_to_json_file(file: str, data: dict) -> None:
         json.dump(data, f, ensure_ascii=False, sort_keys=True, indent=2)
 
 
-def list_files(startpath: str) -> None:
-    """Pretty print all files in a directory"""
+def list_files(startpath: str, exlcude_filetypes=None) -> None:
+    """Pretty print all files in a directory, exlcuding the exclude filetypes"""
+    if exlcude_filetypes is None:
+        exlcude_filetypes = ['.gitignore', '.md']
     for root, _, files in os.walk(startpath):
         level = root.replace(startpath, '').count(os.sep)
         indent = ' ' * 4 * (level)
         print(f'{indent}{os.path.basename(root)}/')
         subindent = ' ' * 4 * (level + 1)
         for f in files:
+            exclude_file = False
+            for excl_filetype in exlcude_filetypes:
+                if f.lower().endswith(excl_filetype):
+                    exclude_file = True
+            if exclude_file:
+                continue
             print(f'{subindent}{f}')
